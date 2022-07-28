@@ -11,7 +11,7 @@ const (
 	WTS_CURRENT_SERVER_HANDLE windows.Handle = 0
 )
 
-//Open Process Token using PID, pass 0 as PID for self token
+//OpenProcessToken opens a process token using PID, pass 0 as PID for self token
 func OpenProcessToken(pid int, tokenType tokenType) (*Token, error) {
 	var (
 		t               windows.Token
@@ -60,7 +60,8 @@ func OpenProcessToken(pid int, tokenType tokenType) (*Token, error) {
 	return &Token{token: duplicatedToken, typ: tokenType}, nil
 }
 
-// Get the Interactive token associated with current logged in user
+//GetInteractiveToken gets the interactive token associated with current logged in user
+//It uses windows API WTSEnumerateSessions, WTSQueryUserToken and DuplicateTokenEx to return a valid wintoken
 func GetInteractiveToken(tokenType tokenType) (*Token, error) {
 
 	switch tokenType {

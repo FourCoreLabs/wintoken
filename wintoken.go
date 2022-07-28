@@ -31,6 +31,8 @@ type Token struct {
 	token windows.Token
 }
 
+//TokenUserDetail is the structure that exposes token details
+//Details contain Username, Domain, Account Type, User Profile Directory, Environment
 type TokenUserDetail struct {
 	Username       string
 	Domain         string
@@ -43,6 +45,8 @@ func (t TokenUserDetail) String() string {
 	return fmt.Sprintf("Username: %s, Domain: %s, Account Type: %d, UserProfileDir: %s", t.Username, t.Domain, t.AccountType, t.UserProfileDir)
 }
 
+//Privilege is the structure which exposes privilege details
+//Details contain Name, Description, Enabled, EnabledByDefault, Removed, UsedForAccess
 type Privilege struct {
 	Name             string
 	Description      string
@@ -63,12 +67,14 @@ func (p Privilege) String() string {
 }
 
 const (
-	TokenUnknown tokenType = iota
+	tokenUnknown tokenType = iota
 	TokenPrimary
 	TokenImpersonation
 	TokenLinked
 )
 
+//NewToken can be used to supply your own token for the wintoken struct
+//so you can use the same flexiblity provided by the package
 func NewToken(token windows.Token, typ tokenType) *Token {
 	return &Token{
 		token: token,
@@ -76,12 +82,12 @@ func NewToken(token windows.Token, typ tokenType) *Token {
 	}
 }
 
-// Return the underlying token for use
+//Token returns the underlying token for use
 func (t *Token) Token() windows.Token {
 	return t.token
 }
 
-// Close the underlying token
+//Close closes the underlying token
 func (t *Token) Close() {
 	windows.Close(windows.Handle(t.token))
 	t.token = 0
@@ -117,7 +123,7 @@ func lookupPrivilegeNameByLUID(luid uint64) (string, string, error) {
 	return windows.UTF16ToString(nameBuffer), windows.UTF16ToString(displayNameBuffer), nil
 }
 
-// Get User details associated with token
+//UserDetails gets User details associated with token
 func (t *Token) UserDetails() (TokenUserDetail, error) {
 	uSid, err := t.token.GetTokenUser()
 	if err != nil {
@@ -138,7 +144,7 @@ func (t *Token) UserDetails() (TokenUserDetail, error) {
 	return TokenUserDetail{Username: user, Domain: domain, AccountType: typ, UserProfileDir: uProfDir, Environ: env}, nil
 }
 
-// List all Privileges from the token
+//GetPrivileges lists all Privileges from the token
 func (t *Token) GetPrivileges() ([]Privilege, error) {
 	if err := t.errIfTokenClosed(); err != nil {
 		return nil, err
@@ -194,7 +200,7 @@ func (t *Token) GetPrivileges() ([]Privilege, error) {
 	return privDetails, nil
 }
 
-// Enable All Privileges from Token
+//EnableAllPrivileges enables all privileges in the token
 func (t *Token) EnableAllPrivileges() error {
 	if err := t.errIfTokenClosed(); err != nil {
 		return err
@@ -215,7 +221,7 @@ func (t *Token) EnableAllPrivileges() error {
 	return t.modifyTokenPrivileges(toBeEnabled, PrivEnable)
 }
 
-// Disable All Privileges from Token
+//DisableAllPrivileges disables all privileges in the token
 func (t *Token) DisableAllPrivileges() error {
 	if err := t.errIfTokenClosed(); err != nil {
 		return err
@@ -236,7 +242,7 @@ func (t *Token) DisableAllPrivileges() error {
 	return t.modifyTokenPrivileges(toBeDisabled, PrivDisable)
 }
 
-// Remove All Privileges from Token
+//RemoveAllPrivileges removes all privileges from the token
 func (t *Token) RemoveAllPrivileges() error {
 	if err := t.errIfTokenClosed(); err != nil {
 		return err
@@ -257,32 +263,32 @@ func (t *Token) RemoveAllPrivileges() error {
 	return t.modifyTokenPrivileges(toBeRemoved, PrivRemove)
 }
 
-// Enable token privileges by name
+//EnableTokenPrivileges enables token privileges by list of privilege names
 func (t *Token) EnableTokenPrivileges(privs []string) error {
 	return t.modifyTokenPrivileges(privs, PrivEnable)
 }
 
-// Disable token privileges by name
+//DisableTokenPrivileges disables token privileges by list of privilege names
 func (t *Token) DisableTokenPrivileges(privs []string) error {
 	return t.modifyTokenPrivileges(privs, PrivDisable)
 }
 
-// Remove token privileges by name
+//RemoveTokenPrivileges removes token privileges by list of privilege names
 func (t *Token) RemoveTokenPrivileges(privs []string) error {
 	return t.modifyTokenPrivileges(privs, PrivRemove)
 }
 
-// Enable token privilege by name
+//EnableTokenPrivileges enables token privileges by privilege name
 func (t *Token) EnableTokenPrivilege(priv string) error {
 	return t.modifyTokenPrivilege(priv, PrivEnable)
 }
 
-// Disable token privilege by name
+//DisableTokenPrivilege disables token privileges by privilege name
 func (t *Token) DisableTokenPrivilege(priv string) error {
 	return t.modifyTokenPrivilege(priv, PrivDisable)
 }
 
-// Remove token privilege by name
+//RemoveTokenPrivilege removes token privileges by privilege name
 func (t *Token) RemoveTokenPrivilege(priv string) error {
 	return t.modifyTokenPrivilege(priv, PrivRemove)
 }
@@ -386,7 +392,7 @@ func (t *Token) GetIntegrityLevel() (string, error) {
 	}
 }
 
-// GetLinkedToken is used to get the linked token in
+// GetLinkedToken is used to get the linked token if any
 func (t *Token) GetLinkedToken() (*Token, error) {
 
 	lt, err := t.token.GetLinkedToken()
