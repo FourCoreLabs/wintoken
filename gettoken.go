@@ -11,7 +11,21 @@ const (
 	WTS_CURRENT_SERVER_HANDLE windows.Handle = 0
 )
 
-//OpenProcessToken opens a process token using PID, pass 0 as PID for self token
+type iLogger interface {
+	Debug(args ...interface{})
+	Info(args ...interface{})
+	Error(args ...interface{})
+}
+
+type quasiLogger func(args ...interface{})
+
+var logger iLogger
+
+func init() {
+	logger = quasiLogger(func(args ...interface{}) {})
+}
+
+// OpenProcessToken opens a process token using PID, pass 0 as PID for self token
 func OpenProcessToken(pid int, tokenType tokenType) (*Token, error) {
 	var (
 		t               windows.Token
@@ -44,7 +58,6 @@ func OpenProcessToken(pid int, tokenType tokenType) (*Token, error) {
 		if err := windows.DuplicateTokenEx(t, windows.MAXIMUM_ALLOWED, nil, windows.SecurityImpersonation, windows.TokenImpersonation, &duplicatedToken); err != nil {
 			return nil, fmt.Errorf("error while DuplicateTokenEx: %w", err)
 		}
-
 	case TokenLinked:
 		if err := windows.DuplicateTokenEx(t, windows.MAXIMUM_ALLOWED, nil, windows.SecurityDelegation, windows.TokenPrimary, &duplicatedToken); err != nil {
 			return nil, fmt.Errorf("error while DuplicateTokenEx: %w", err)
@@ -60,8 +73,8 @@ func OpenProcessToken(pid int, tokenType tokenType) (*Token, error) {
 	return &Token{token: duplicatedToken, typ: tokenType}, nil
 }
 
-//GetInteractiveToken gets the interactive token associated with current logged in user
-//It uses windows API WTSEnumerateSessions, WTSQueryUserToken and DuplicateTokenEx to return a valid wintoken
+// GetInteractiveToken gets the interactive token associated with current logged in user
+// It uses windows API WTSEnumerateSessions, WTSQueryUserToken and DuplicateTokenEx to return a valid wintoken
 func GetInteractiveToken(tokenType tokenType) (*Token, error) {
 
 	switch tokenType {
@@ -71,11 +84,9 @@ func GetInteractiveToken(tokenType tokenType) (*Token, error) {
 	}
 
 	var (
-		sessionPointer   uintptr
-		sessionCount     uint32
-		interactiveToken windows.Token
-		duplicatedToken  windows.Token
-		sessionID        uint32
+		sessionPointer uintptr
+		sessionCount   uint32
+		sessionID      uint32
 	)
 
 	err := windows.WTSEnumerateSessions(WTS_CURRENT_SERVER_HANDLE, 0, 1, (**windows.WTS_SESSION_INFO)(unsafe.Pointer(&sessionPointer)), &sessionCount)
@@ -100,6 +111,22 @@ func GetInteractiveToken(tokenType tokenType) (*Token, error) {
 	if sessionID == 0 {
 		return nil, ErrNoActiveSession
 	}
+
+	logger.Debug(fmt.Sprintf("will be used sessionID: %d", sessionID))
+	return GetTokenBySessionID(tokenType, sessionID)
+}
+
+func GetTokenBySessionID(tokenType tokenType, sessionID uint32) (*Token, error) {
+	switch tokenType {
+	case TokenPrimary, TokenImpersonation, TokenLinked:
+	default:
+		return nil, fmt.Errorf("only primary or impersonation token types allowed")
+	}
+
+	var (
+		interactiveToken windows.Token
+		duplicatedToken  windows.Token
+	)
 
 	if err := windows.WTSQueryUserToken(sessionID, &interactiveToken); err != nil {
 		return nil, fmt.Errorf("error while WTSQueryUserToken: %w", err)
@@ -133,4 +160,20 @@ func GetInteractiveToken(tokenType tokenType) (*Token, error) {
 	}
 
 	return &Token{typ: tokenType, token: duplicatedToken}, nil
+}
+
+func SetLogger(l iLogger) {
+	logger = l
+}
+
+func (q quasiLogger) Debug(args ...interface{}) {
+	q(args)
+}
+
+func (q quasiLogger) Info(args ...interface{}) {
+	q(args)
+}
+
+func (q quasiLogger) Error(args ...interface{}) {
+	q(args)
 }
